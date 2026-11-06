@@ -7,7 +7,7 @@ It uses two sheets:
 - **Summary** — project, client, status, next milestone, milestone date, and main problem
 - **Risk and Issue** — issues, risks, change requests, owners, actions, and due dates
 
-The report opens with an executive summary: portfolio health, one paragraph per project, the week’s actions by due date, and a short recommended-focus list.
+The report opens with an executive summary: each project's status and next milestone, the highest-exposure risk, the week's actions by due date, and a short recommended-focus list.
 
 Each project in `Weekly_Report.txt` then includes:
 

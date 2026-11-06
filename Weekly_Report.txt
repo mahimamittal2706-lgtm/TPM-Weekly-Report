@@ -8,16 +8,17 @@ Risks     : 4
 
 EXECUTIVE SUMMARY
 ------------------------------------------------------------------------
-2 projects this week: 1 Red (Kavach) and 1 Amber (Ledger). 4 issues and
-4 risks are open, plus 1 change request.
+Kavach (Nirmal Finance) is Red ahead of UAT Start (Thursday) and Ledger
+(Sagar Publications) is Amber ahead of Sprint 4 Completion (Friday). 4
+issues and 4 risks are open, plus 1 change request.
 
 Portfolio
-  Kavach (Nirmal Finance) is Red. Next milestone: UAT Start (Thursday).
-  Main problem: wrong EMI amounts and telecom IP approval risk. Open
-  this week: 2 issues and 3 risks.
-  Ledger (Sagar Publications) is Amber. Next milestone: Sprint 4
-  Completion (Friday). Main problem: 1200 duplicate customer records in
-  migration. Open this week: 2 issues and 1 risk.
+  Kavach: Wrong EMI amounts and telecom IP approval risk. Highest
+  exposure is K-03, Telecom IP approval delay (Dev, Monday; High
+  probability, High impact). Open this week: 2 issues and 3 risks.
+  Ledger: 1200 duplicate customer records in migration. Highest exposure
+  is L-02, Kavach work may delay migration fix (TPM, Tuesday; High
+  probability, High impact). Open this week: 2 issues and 1 risk.
 
 Week at a glance
   Monday
@@ -35,11 +36,14 @@ Week at a glance
 
 Recommended focus
   1. Mitigate Kavach K-03 before Monday: Telecom IP approval delay
-     (Dev). Probability and impact are both High.
+     (Dev). Probability and impact are both High. It sits in front of
+     UAT Start (Thursday).
   2. Mitigate Ledger L-02 before Tuesday: Kavach work may delay
-     migration fix (TPM). Probability and impact are both High.
+     migration fix (TPM). Probability and impact are both High. It sits
+     in front of Sprint 4 Completion (Friday).
   3. Mitigate Kavach K-04 before Tuesday: Meera on leave before UAT
-     (TPM). Probability is High and impact is Medium.
+     (TPM). Probability is High and impact is Medium. It sits in front
+     of UAT Start (Thursday).
   4. Arjun is on Tuesday for both Kavach and Ledger (K-02, L-01).
      Sequence that work before both slip.
   5. TPM is on Tuesday for both Kavach and Ledger (K-04, L-02). Sequence
@@ -96,11 +100,11 @@ Risks
   Due Date          : Wednesday
 
 Recommended Actions
-  - [K-03] Escalate approval (Risk) | Owner: Dev | Due Date: Monday
-  - [K-01] Root cause analysis (Issue) | Owner: Meera | Due Date: Tuesday
-  - [K-02] Review logs and integration (Issue) | Owner: Arjun | Due Date: Tuesday
-  - [K-04] Complete AI fixes and handover (Risk) | Owner: TPM | Due Date: Tuesday
-  - [K-05] Cost analysis (Risk) | Owner: Meera | Due Date: Wednesday
+  - [K-03] Escalate approval — Telecom IP approval delay (Risk) | Owner: Dev | Due Date: Monday
+  - [K-01] Root cause analysis — Wrong EMI amount in test calls (Issue) | Owner: Meera | Due Date: Tuesday
+  - [K-02] Review logs and integration — Calls terminate after 40 seconds (Issue) | Owner: Arjun | Due Date: Tuesday
+  - [K-04] Complete AI fixes and handover — Meera on leave before UAT (Risk) | Owner: TPM | Due Date: Tuesday
+  - [K-05] Cost analysis — AI cost 40% above budget (Risk) | Owner: Meera | Due Date: Wednesday
 
 ========================================================================
 
@@ -144,9 +148,9 @@ Change Request
   Due Date    : Wednesday
 
 Recommended Actions
-  - [L-03] Send report to COO (Issue) | Owner: TPM | Due Date: Monday
-  - [L-01] Dedupe fix (Issue) | Owner: Arjun | Due Date: Tuesday
-  - [L-02] Reprioritize resources (Risk) | Owner: TPM | Due Date: Tuesday
-  - [L-04] Assess scope and effort (Change Request) | Owner: TPM | Due Date: Wednesday
+  - [L-03] Send report to COO — Status report not sent (Issue) | Owner: TPM | Due Date: Monday
+  - [L-01] Dedupe fix — 1200 duplicate records (Issue) | Owner: Arjun | Due Date: Tuesday
+  - [L-02] Reprioritize resources — Kavach work may delay migration fix (Risk) | Owner: TPM | Due Date: Tuesday
+  - [L-04] Assess scope and effort — WhatsApp birthday campaign request (Change Request) | Owner: TPM | Due Date: Wednesday
 
 ========================================================================

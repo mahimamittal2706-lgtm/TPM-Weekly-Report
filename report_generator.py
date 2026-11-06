@@ -196,7 +196,9 @@ def recommended_action_line(row: pd.Series) -> str | None:
     kind = cell_text(row["Type"]) or "Item"
     owner = cell_text(row["Owner"]) or "Unassigned"
     due = cell_text(row["Due Date"]) or "No due date"
-    return f"  - [{item_id}] {action} ({kind}) | Owner: {owner} | Due Date: {due}"
+    description = cell_text(row["Description"])
+    subject = f"{action} — {description}" if description else action
+    return f"  - [{item_id}] {subject} ({kind}) | Owner: {owner} | Due Date: {due}"
 
 
 def due_rank(due: str) -> tuple:
@@ -453,56 +455,86 @@ def exposure_phrase(row: pd.Series) -> str:
     return ", ".join(parts)
 
 
+def other_items_phrase(log: pd.DataFrame) -> str:
+    """Trailing clause for change requests and any other non-issue, non-risk rows."""
+    if log.empty:
+        return ""
+    types = log["Type"].map(lambda value: cell_text(value).casefold())
+    other = log.loc[~types.isin([ISSUE_TYPE, RISK_TYPE])]
+    if other.empty:
+        return ""
+    labels = []
+    for label in other["Type"].map(cell_text):
+        if label and label not in labels:
+            labels.append(label)
+    if len(labels) == 1:
+        return f", plus {count_phrase(len(other), labels[0].lower())}"
+    return f", plus {count_phrase(len(other), 'other item')}"
+
+
 def portfolio_headline(briefs: list[ProjectBrief], log: pd.DataFrame, issue_count: int, risk_count: int) -> str:
-    """One opening sentence: how many projects, how they sit, how much is open."""
+    """Opening line: each project's status and next milestone, then the open-item count."""
     if not briefs:
         return "No projects were found in the workbook."
 
-    named: list[str] = []
-    seen: set[str] = set()
-    for status in STATUS_ORDER:
-        matches = [brief.name for brief in briefs if brief.status.casefold() == status.casefold()]
-        if matches:
-            seen.add(status.casefold())
-            named.append(f"{len(matches)} {status} ({join_names(matches)})")
-    for brief in briefs:
-        key = brief.status.casefold()
-        if key in seen:
-            continue
-        matches = [item.name for item in briefs if item.status.casefold() == key]
-        seen.add(key)
-        named.append(f"{len(matches)} {brief.status} ({join_names(matches)})")
+    # Red before Amber before Green, stable within a status so Summary order holds.
+    status_rank = {name.casefold(): index for index, name in enumerate(STATUS_ORDER)}
+    ordered = sorted(
+        enumerate(briefs),
+        key=lambda pair: (status_rank.get(pair[1].status.casefold(), len(STATUS_ORDER)), pair[0]),
+    )
+    clauses = []
+    for _, brief in ordered:
+        client = f" ({brief.client})" if brief.client != "Not recorded" else ""
+        if brief.milestone and brief.milestone != "Not recorded":
+            clauses.append(f"{brief.name}{client} is {brief.status} ahead of {brief.milestone}")
+        else:
+            clauses.append(f"{brief.name}{client} is {brief.status}")
 
-    extra = ""
-    if not log.empty:
-        types = log["Type"].map(lambda value: cell_text(value).casefold())
-        other = log.loc[~types.isin([ISSUE_TYPE, RISK_TYPE])]
-        if not other.empty:
-            labels = []
-            for label in other["Type"].map(cell_text):
-                if label and label not in labels:
-                    labels.append(label)
-            if len(labels) == 1:
-                extra = f", plus {count_phrase(len(other), labels[0].lower())}"
-            else:
-                extra = f", plus {count_phrase(len(other), 'other item')}"
-
+    opening = join_names(clauses)
+    opening = opening[0].upper() + opening[1:]
     return (
-        f"{count_phrase(len(briefs), 'project').capitalize()} this week: {join_names(named)}. "
+        f"{opening}. "
         f"{count_phrase(issue_count, 'issue').capitalize()} and {count_phrase(risk_count, 'risk')} "
-        f"are open{extra}."
+        f"are open{other_items_phrase(log)}."
     )
 
 
-def project_paragraph(brief: ProjectBrief) -> str:
-    """Status, milestone, main problem, and open-item counts for one project."""
-    client = brief.client if brief.client != "Not recorded" else "client not recorded"
-    sentence = f"{brief.name} ({client}) is {brief.status}. Next milestone: {brief.milestone}."
+def highest_risk_sentence(log_rows: pd.DataFrame) -> str:
+    """Name the risk with the highest impact, then probability, then the nearest due date."""
+    if log_rows.empty:
+        return ""
+    risks = [row for _, row in log_rows.iterrows() if log_type(row) == RISK_TYPE]
+    if not risks:
+        return ""
+    row = min(
+        risks,
+        key=lambda item: (
+            severity_rank(cell_text(item["Impact"])),
+            severity_rank(cell_text(item["Probability"])),
+            due_rank(cell_text(item["Due Date"])),
+        ),
+    )
+    item_id = cell_text(row["ID"]) or "—"
+    description = cell_text(row["Description"]) or "an open risk"
+    owner = cell_text(row["Owner"]) or "Unassigned"
+    due = cell_text(row["Due Date"]) or "no due date"
+    exposure = exposure_phrase(row)
+    detail = f"{owner}, {due}"
+    if exposure:
+        detail = f"{detail}; {exposure}"
+    return f"Highest exposure is {item_id}, {description} ({detail})."
+
+
+def project_paragraph(brief: ProjectBrief, log_rows: pd.DataFrame) -> str:
+    """Main problem, the top risk, and how many items are open on this project."""
     if brief.main_problem and brief.main_problem != "Not recorded":
-        problem = brief.main_problem
-        if problem[0].isalpha():
-            problem = problem[0].lower() + problem[1:]
-        sentence += f" Main problem: {problem}."
+        sentence = f"{brief.name}: {brief.main_problem}."
+    else:
+        sentence = f"{brief.name} has no main problem recorded."
+    risk = highest_risk_sentence(log_rows)
+    if risk:
+        sentence += f" {risk}"
     sentence += (
         f" Open this week: {count_phrase(brief.issue_count, 'issue')} and "
         f"{count_phrase(brief.risk_count, 'risk')}."
@@ -586,7 +618,15 @@ def owner_conflicts(log: pd.DataFrame, project_order: dict[str, int] | None = No
     return conflicts
 
 
-def elevated_risk_bullets(log: pd.DataFrame) -> list[str]:
+def milestone_for(project: str, briefs: list[ProjectBrief]) -> str:
+    """Next milestone for a project name, or an empty string when none is recorded."""
+    for brief in briefs:
+        if brief.name.casefold() == project.casefold() and brief.milestone != "Not recorded":
+            return brief.milestone
+    return ""
+
+
+def elevated_risk_bullets(log: pd.DataFrame, briefs: list[ProjectBrief]) -> list[str]:
     """Risks with high probability and medium or high impact, highest exposure first."""
     if log.empty:
         return []
@@ -609,8 +649,10 @@ def elevated_risk_bullets(log: pd.DataFrame) -> list[str]:
             exposure = "Probability and impact are both High."
         else:
             exposure = f"Probability is High and impact is {impact}."
+        milestone = milestone_for(project, briefs)
+        timing = f" It sits in front of {milestone}." if milestone else ""
         bullets.append(
-            f"Mitigate {project} {item_id} before {due}: {description} ({owner}). {exposure}"
+            f"Mitigate {project} {item_id} before {due}: {description} ({owner}). {exposure}{timing}"
         )
     return bullets
 
@@ -635,9 +677,13 @@ def earliest_due_bullet(log: pd.DataFrame, project_order: dict[str, int] | None 
     return f"Clear {first_due} first ({', '.join(ids)}). Later due dates depend on that work landing."
 
 
-def focus_bullets(log: pd.DataFrame, project_order: dict[str, int] | None = None) -> list[str]:
+def focus_bullets(
+    log: pd.DataFrame,
+    briefs: list[ProjectBrief],
+    project_order: dict[str, int] | None = None,
+) -> list[str]:
     """The few actions leadership should track, capped so the summary stays short."""
-    bullets = elevated_risk_bullets(log)
+    bullets = elevated_risk_bullets(log, briefs)
     bullets.extend(owner_conflicts(log, project_order))
     earliest = earliest_due_bullet(log, project_order)
     if earliest:
@@ -672,14 +718,15 @@ def build_executive_summary(
     if briefs:
         lines.append("Portfolio")
         for brief in briefs:
-            lines.extend(wrap_lines(project_paragraph(brief)))
+            project_rows = rows_for_project(log, brief.name.casefold())
+            lines.extend(wrap_lines(project_paragraph(brief, project_rows)))
         lines.append("")
 
     project_order = {brief.name.casefold(): index for index, brief in enumerate(briefs)}
     lines.extend(week_at_a_glance(log, project_order))
     lines.append("")
     lines.append("Recommended focus")
-    for number, bullet in enumerate(focus_bullets(log, project_order), start=1):
+    for number, bullet in enumerate(focus_bullets(log, briefs, project_order), start=1):
         lines.extend(wrap_bullet(number, bullet))
     return lines
 
