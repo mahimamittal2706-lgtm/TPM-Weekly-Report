@@ -9,60 +9,105 @@ Risks     : 4
 1. Kavach
 ---------
 Project Name   : Kavach
-Client Name    : Nirmal Finance
+Client         : Nirmal Finance
 Status         : Red
 Next Milestone : UAT Start (Thursday)
 Main Problem   : Wrong EMI amounts and telecom IP approval risk
 
 Issues
-  - [K-01] Wrong EMI amount in test calls
-    Probability: High | Impact: High | Owner: Meera | Due: Tuesday
-  - [K-02] Calls terminate after 40 seconds
-    Probability: Medium | Impact: High | Owner: Arjun | Due: Tuesday
+  Issue ID    : K-01
+  Description : Wrong EMI amount in test calls
+  Owner       : Meera
+  Impact      : High
+  Action      : Root cause analysis
+  Due Date    : Tuesday
+
+  Issue ID    : K-02
+  Description : Calls terminate after 40 seconds
+  Owner       : Arjun
+  Impact      : High
+  Action      : Review logs and integration
+  Due Date    : Tuesday
 
 Risks
-  - [K-03] Telecom IP approval delay
-    Probability: High | Impact: High | Owner: Dev | Due: Monday
-  - [K-04] Meera on leave before UAT
-    Probability: High | Impact: Medium | Owner: TPM | Due: Tuesday
-  - [K-05] AI cost 40% above budget
-    Probability: Medium | Impact: Medium | Owner: Meera | Due: Wednesday
+  Risk ID           : K-03
+  Description       : Telecom IP approval delay
+  Probability       : High
+  Impact            : High
+  Owner             : Dev
+  Mitigation Action : Escalate approval
+  Due Date          : Monday
 
-Action Items
-  - [K-01] Root cause analysis | Owner: Meera | Due: Tuesday
-  - [K-02] Review logs and integration | Owner: Arjun | Due: Tuesday
-  - [K-03] Escalate approval | Owner: Dev | Due: Monday
-  - [K-04] Complete AI fixes and handover | Owner: TPM | Due: Tuesday
-  - [K-05] Cost analysis | Owner: Meera | Due: Wednesday
+  Risk ID           : K-04
+  Description       : Meera on leave before UAT
+  Probability       : High
+  Impact            : Medium
+  Owner             : TPM
+  Mitigation Action : Complete AI fixes and handover
+  Due Date          : Tuesday
+
+  Risk ID           : K-05
+  Description       : AI cost 40% above budget
+  Probability       : Medium
+  Impact            : Medium
+  Owner             : Meera
+  Mitigation Action : Cost analysis
+  Due Date          : Wednesday
+
+Recommended Actions
+  - [K-01] Root cause analysis (Issue) | Owner: Meera | Due Date: Tuesday
+  - [K-02] Review logs and integration (Issue) | Owner: Arjun | Due Date: Tuesday
+  - [K-03] Escalate approval (Risk) | Owner: Dev | Due Date: Monday
+  - [K-04] Complete AI fixes and handover (Risk) | Owner: TPM | Due Date: Tuesday
+  - [K-05] Cost analysis (Risk) | Owner: Meera | Due Date: Wednesday
 
 ========================================================================
 
 2. Ledger
 ---------
 Project Name   : Ledger
-Client Name    : Sagar Publications
+Client         : Sagar Publications
 Status         : Amber
 Next Milestone : Sprint 4 Completion (Friday)
 Main Problem   : 1200 duplicate customer records in migration
 
 Issues
-  - [L-01] 1200 duplicate records
-    Probability: High | Impact: High | Owner: Arjun | Due: Tuesday
-  - [L-03] Status report not sent
-    Probability: High | Impact: Medium | Owner: TPM | Due: Monday
+  Issue ID    : L-01
+  Description : 1200 duplicate records
+  Owner       : Arjun
+  Impact      : High
+  Action      : Dedupe fix
+  Due Date    : Tuesday
+
+  Issue ID    : L-03
+  Description : Status report not sent
+  Owner       : TPM
+  Impact      : Medium
+  Action      : Send report to COO
+  Due Date    : Monday
 
 Risks
-  - [L-02] Kavach work may delay migration fix
-    Probability: High | Impact: High | Owner: TPM | Due: Tuesday
+  Risk ID           : L-02
+  Description       : Kavach work may delay migration fix
+  Probability       : High
+  Impact            : High
+  Owner             : TPM
+  Mitigation Action : Reprioritize resources
+  Due Date          : Tuesday
 
 Change Request
-  - [L-04] WhatsApp birthday campaign request
-    Probability: Medium | Impact: Medium | Owner: TPM | Due: Wednesday
+  ID          : L-04
+  Description : WhatsApp birthday campaign request
+  Probability : Medium
+  Impact      : Medium
+  Owner       : TPM
+  Action      : Assess scope and effort
+  Due Date    : Wednesday
 
-Action Items
-  - [L-01] Dedupe fix | Owner: Arjun | Due: Tuesday
-  - [L-02] Reprioritize resources | Owner: TPM | Due: Tuesday
-  - [L-03] Send report to COO | Owner: TPM | Due: Monday
-  - [L-04] Assess scope and effort | Owner: TPM | Due: Wednesday
+Recommended Actions
+  - [L-01] Dedupe fix (Issue) | Owner: Arjun | Due Date: Tuesday
+  - [L-02] Reprioritize resources (Risk) | Owner: TPM | Due Date: Tuesday
+  - [L-03] Send report to COO (Issue) | Owner: TPM | Due Date: Monday
+  - [L-04] Assess scope and effort (Change Request) | Owner: TPM | Due Date: Wednesday
 
 ========================================================================

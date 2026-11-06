@@ -1,7 +1,9 @@
 """Build a TPM weekly status report from an Excel workbook.
 
 Reads the Summary sheet and the Risk and Issue sheet, then writes one
-text section per project to Weekly_Report.txt.
+detailed text section per project to Weekly_Report.txt. Each project
+lists client, status, and next milestone, then issues, risks, and
+recommended actions.
 """
 
 from __future__ import annotations
@@ -122,39 +124,74 @@ def format_milestone(milestone: str, milestone_date: str) -> str:
     return milestone or milestone_date or "Not recorded"
 
 
-def item_lines(row: pd.Series) -> list[str]:
-    """Format one risk, issue, or other log row as a short block of text."""
-    item_id = cell_text(row["ID"]) or "—"
-    description = cell_text(row["Description"]) or "No description"
-    probability = cell_text(row["Probability"]) or "—"
-    impact = cell_text(row["Impact"]) or "—"
-    owner = cell_text(row["Owner"]) or "—"
-    due = cell_text(row["Due Date"]) or "—"
+def field_line(label: str, value: str, width: int) -> str:
+    """One labelled field, padded so values in a block line up."""
+    return f"  {label:<{width}} : {value}"
+
+
+def issue_lines(row: pd.Series) -> list[str]:
+    """Format one issue with id, description, owner, impact, action, and due date."""
+    width = len("Description")
     return [
-        f"  - [{item_id}] {description}",
-        f"    Probability: {probability} | Impact: {impact} | Owner: {owner} | Due: {due}",
+        field_line("Issue ID", cell_text(row["ID"]) or "—", width),
+        field_line("Description", cell_text(row["Description"]) or "No description", width),
+        field_line("Owner", cell_text(row["Owner"]) or "—", width),
+        field_line("Impact", cell_text(row["Impact"]) or "—", width),
+        field_line("Action", cell_text(row["Action"]) or "—", width),
+        field_line("Due Date", cell_text(row["Due Date"]) or "—", width),
     ]
 
 
-def action_line(row: pd.Series) -> str | None:
-    """Return one action-item line, or None when the Action cell is empty."""
+def risk_lines(row: pd.Series) -> list[str]:
+    """Format one risk, including probability and the mitigation action."""
+    width = len("Mitigation Action")
+    return [
+        field_line("Risk ID", cell_text(row["ID"]) or "—", width),
+        field_line("Description", cell_text(row["Description"]) or "No description", width),
+        field_line("Probability", cell_text(row["Probability"]) or "—", width),
+        field_line("Impact", cell_text(row["Impact"]) or "—", width),
+        field_line("Owner", cell_text(row["Owner"]) or "—", width),
+        field_line("Mitigation Action", cell_text(row["Action"]) or "—", width),
+        field_line("Due Date", cell_text(row["Due Date"]) or "—", width),
+    ]
+
+
+def other_lines(row: pd.Series) -> list[str]:
+    """Format a log row that is neither an issue nor a risk."""
+    width = len("Description")
+    return [
+        field_line("ID", cell_text(row["ID"]) or "—", width),
+        field_line("Description", cell_text(row["Description"]) or "No description", width),
+        field_line("Probability", cell_text(row["Probability"]) or "—", width),
+        field_line("Impact", cell_text(row["Impact"]) or "—", width),
+        field_line("Owner", cell_text(row["Owner"]) or "—", width),
+        field_line("Action", cell_text(row["Action"]) or "—", width),
+        field_line("Due Date", cell_text(row["Due Date"]) or "—", width),
+    ]
+
+
+def recommended_action_line(row: pd.Series) -> str | None:
+    """Return one recommended-action line, or None when the Action cell is empty."""
     action = cell_text(row["Action"])
     if not action:
         return None
     item_id = cell_text(row["ID"]) or "—"
+    kind = cell_text(row["Type"]) or "Item"
     owner = cell_text(row["Owner"]) or "Unassigned"
     due = cell_text(row["Due Date"]) or "No due date"
-    return f"  - [{item_id}] {action} | Owner: {owner} | Due: {due}"
+    return f"  - [{item_id}] {action} ({kind}) | Owner: {owner} | Due Date: {due}"
 
 
-def section_block(title: str, rows: pd.DataFrame) -> list[str]:
+def section_block(title: str, rows: pd.DataFrame, formatter) -> list[str]:
     """Render a labelled list. An empty frame becomes a single 'None' line."""
     lines = [title]
     if rows.empty:
         lines.append("  None")
         return lines
-    for _, row in rows.iterrows():
-        lines.extend(item_lines(row))
+    for index, (_, row) in enumerate(rows.iterrows()):
+        if index:
+            lines.append("")
+        lines.extend(formatter(row))
     return lines
 
 
@@ -184,12 +221,13 @@ def build_project_section(summary_row: pd.Series | None, log_rows: pd.DataFrame,
         )
         main_problem = cell_text(summary_row["Main Problem"]) or "Not recorded"
 
+    label_width = len("Next Milestone")
     lines = [
-        f"Project Name   : {project_name}",
-        f"Client Name    : {client}",
-        f"Status         : {status}",
-        f"Next Milestone : {milestone}",
-        f"Main Problem   : {main_problem}",
+        field_line("Project Name", project_name, label_width).lstrip(),
+        field_line("Client", client, label_width).lstrip(),
+        field_line("Status", status, label_width).lstrip(),
+        field_line("Next Milestone", milestone, label_width).lstrip(),
+        field_line("Main Problem", main_problem, label_width).lstrip(),
         "",
     ]
 
@@ -199,20 +237,24 @@ def build_project_section(summary_row: pd.Series | None, log_rows: pd.DataFrame,
     risks = log_rows.loc[type_key == RISK_TYPE] if not log_rows.empty else log_rows
     other = log_rows.loc[~type_key.isin([ISSUE_TYPE, RISK_TYPE])] if not log_rows.empty else log_rows
 
-    lines.extend(section_block("Issues", issues))
+    lines.extend(section_block("Issues", issues, issue_lines))
     lines.append("")
-    lines.extend(section_block("Risks", risks))
+    lines.extend(section_block("Risks", risks, risk_lines))
     lines.append("")
 
     # Keep change requests and any other types visible instead of dropping them.
     if not other.empty:
         for type_name, group in other.groupby(other["Type"].map(cell_text), sort=False):
             heading = type_name or "Other"
-            lines.extend(section_block(heading, group))
+            lines.extend(section_block(heading, group, other_lines))
             lines.append("")
 
-    lines.append("Action Items")
-    actions = [line for line in (action_line(row) for _, row in log_rows.iterrows()) if line]
+    lines.append("Recommended Actions")
+    actions = [
+        line
+        for line in (recommended_action_line(row) for _, row in log_rows.iterrows())
+        if line
+    ]
     if actions:
         lines.extend(actions)
     else:
