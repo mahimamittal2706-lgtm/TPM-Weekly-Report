@@ -6,10 +6,53 @@ Projects  : 2
 Issues    : 4
 Risks     : 4
 
+EXECUTIVE SUMMARY
+------------------------------------------------------------------------
+2 projects this week: 1 Red (Kavach) and 1 Amber (Ledger). 4 issues and
+4 risks are open, plus 1 change request.
+
+Portfolio
+  Kavach (Nirmal Finance) is Red. Next milestone: UAT Start (Thursday).
+  Main problem: wrong EMI amounts and telecom IP approval risk. Open
+  this week: 2 issues and 3 risks.
+  Ledger (Sagar Publications) is Amber. Next milestone: Sprint 4
+  Completion (Friday). Main problem: 1200 duplicate customer records in
+  migration. Open this week: 2 issues and 1 risk.
+
+Week at a glance
+  Monday
+    - [K-03] Escalate approval — Dev — Kavach Risk — High probability, High impact
+    - [L-03] Send report to COO — TPM — Ledger Issue — High probability, Medium impact
+  Tuesday
+    - [K-01] Root cause analysis — Meera — Kavach Issue — High probability, High impact
+    - [K-02] Review logs and integration — Arjun — Kavach Issue — Medium probability, High impact
+    - [K-04] Complete AI fixes and handover — TPM — Kavach Risk — High probability, Medium impact
+    - [L-01] Dedupe fix — Arjun — Ledger Issue — High probability, High impact
+    - [L-02] Reprioritize resources — TPM — Ledger Risk — High probability, High impact
+  Wednesday
+    - [K-05] Cost analysis — Meera — Kavach Risk — Medium probability, Medium impact
+    - [L-04] Assess scope and effort — TPM — Ledger Change Request — Medium probability, Medium impact
+
+Recommended focus
+  1. Mitigate Kavach K-03 before Monday: Telecom IP approval delay
+     (Dev). Probability and impact are both High.
+  2. Mitigate Ledger L-02 before Tuesday: Kavach work may delay
+     migration fix (TPM). Probability and impact are both High.
+  3. Mitigate Kavach K-04 before Tuesday: Meera on leave before UAT
+     (TPM). Probability is High and impact is Medium.
+  4. Arjun is on Tuesday for both Kavach and Ledger (K-02, L-01).
+     Sequence that work before both slip.
+  5. TPM is on Tuesday for both Kavach and Ledger (K-04, L-02). Sequence
+     that work before both slip.
+  6. Clear Monday first (K-03, L-03). Later due dates depend on that
+     work landing.
+
+========================================================================
+
 1. Kavach
 ---------
 Project Name   : Kavach
-Client         : Nirmal Finance
+Client Name    : Nirmal Finance
 Status         : Red
 Next Milestone : UAT Start (Thursday)
 Main Problem   : Wrong EMI amounts and telecom IP approval risk
@@ -18,14 +61,12 @@ Issues
   Issue ID    : K-01
   Description : Wrong EMI amount in test calls
   Owner       : Meera
-  Impact      : High
   Action      : Root cause analysis
   Due Date    : Tuesday
 
   Issue ID    : K-02
   Description : Calls terminate after 40 seconds
   Owner       : Arjun
-  Impact      : High
   Action      : Review logs and integration
   Due Date    : Tuesday
 
@@ -55,9 +96,9 @@ Risks
   Due Date          : Wednesday
 
 Recommended Actions
+  - [K-03] Escalate approval (Risk) | Owner: Dev | Due Date: Monday
   - [K-01] Root cause analysis (Issue) | Owner: Meera | Due Date: Tuesday
   - [K-02] Review logs and integration (Issue) | Owner: Arjun | Due Date: Tuesday
-  - [K-03] Escalate approval (Risk) | Owner: Dev | Due Date: Monday
   - [K-04] Complete AI fixes and handover (Risk) | Owner: TPM | Due Date: Tuesday
   - [K-05] Cost analysis (Risk) | Owner: Meera | Due Date: Wednesday
 
@@ -66,7 +107,7 @@ Recommended Actions
 2. Ledger
 ---------
 Project Name   : Ledger
-Client         : Sagar Publications
+Client Name    : Sagar Publications
 Status         : Amber
 Next Milestone : Sprint 4 Completion (Friday)
 Main Problem   : 1200 duplicate customer records in migration
@@ -75,14 +116,12 @@ Issues
   Issue ID    : L-01
   Description : 1200 duplicate records
   Owner       : Arjun
-  Impact      : High
   Action      : Dedupe fix
   Due Date    : Tuesday
 
   Issue ID    : L-03
   Description : Status report not sent
   Owner       : TPM
-  Impact      : Medium
   Action      : Send report to COO
   Due Date    : Monday
 
@@ -105,9 +144,9 @@ Change Request
   Due Date    : Wednesday
 
 Recommended Actions
+  - [L-03] Send report to COO (Issue) | Owner: TPM | Due Date: Monday
   - [L-01] Dedupe fix (Issue) | Owner: Arjun | Due Date: Tuesday
   - [L-02] Reprioritize resources (Risk) | Owner: TPM | Due Date: Tuesday
-  - [L-03] Send report to COO (Issue) | Owner: TPM | Due Date: Monday
   - [L-04] Assess scope and effort (Change Request) | Owner: TPM | Due Date: Wednesday
 
 ========================================================================

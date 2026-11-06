@@ -7,17 +7,19 @@ It uses two sheets:
 - **Summary** — project, client, status, next milestone, milestone date, and main problem
 - **Risk and Issue** — issues, risks, change requests, owners, actions, and due dates
 
-Each project in `Weekly_Report.txt` includes:
+The report opens with an executive summary: portfolio health, one paragraph per project, the week’s actions by due date, and a short recommended-focus list.
+
+Each project in `Weekly_Report.txt` then includes:
 
 - Project Name
 - Client Name
 - Status
 - Next Milestone
-- Issues
-- Risks
-- Action Items
+- Issues (ID, description, owner, action, due date)
+- Risks (ID, description, probability, impact, owner, mitigation action, due date)
+- Recommended Actions
 
-Change requests (and any other type that is not Issue or Risk) are listed in their own section so they are not dropped. Action items are taken from the Action column for every log row on that project.
+Change requests (and any other type that is not Issue or Risk) are listed in their own section so they are not dropped. Recommended actions are taken from the Action column and ordered by due date.
 
 ## Setup
 
