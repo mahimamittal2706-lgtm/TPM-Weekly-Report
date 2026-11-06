@@ -1,156 +1,323 @@
-TPM WEEKLY REPORT
-========================================================================
+TPM WEEKLY STATUS REPORT
+==============================================================================
 Generated : Saturday, 07 November 2026
 Source    : TPM.xlsx
+Sheets    : Summary; Risk and Issue
 Projects  : 2
+Health    : Red
 Issues    : 4
 Risks     : 4
+Other     : 1
+
+Fields marked "Not recorded" are absent from the tracker. Every project,
+issue, risk, and other logged row is included.
 
 EXECUTIVE SUMMARY
-------------------------------------------------------------------------
-Kavach (Nirmal Finance) is Red ahead of UAT Start (Thursday) and Ledger
-(Sagar Publications) is Amber ahead of Sprint 4 Completion (Friday). 4
-issues and 4 risks are open, plus 1 change request.
+------------------------------------------------------------------------------
+  Total projects         : 2
+  Overall project health : Red
+  Total open issues      : 4
+  Total risks            : 4
 
-Portfolio
-  Kavach: Wrong EMI amounts and telecom IP approval risk. Highest
-  exposure is K-03, Telecom IP approval delay (Dev, Monday; High
-  probability, High impact). Open this week: 2 issues and 3 risks.
-  Ledger: 1200 duplicate customer records in migration. Highest exposure
-  is L-02, Kavach work may delay migration fix (TPM, Tuesday; High
-  probability, High impact). Open this week: 2 issues and 1 risk.
+Portfolio health is Red. Kavach (Nirmal Finance) is Red and Ledger (Sagar
+Publications) is Amber. The open log holds 4 issues and 4 risks, plus 1 Change
+Request. Issue rows are counted as open because the tracker has no closed flag
+and no issue-status column. Progress and issue priority are not in the
+tracker.
 
-Week at a glance
-  Monday
-    - [K-03] Escalate approval — Dev — Kavach Risk — High probability, High impact
-    - [L-03] Send report to COO — TPM — Ledger Issue — High probability, Medium impact
-  Tuesday
-    - [K-01] Root cause analysis — Meera — Kavach Issue — High probability, High impact
-    - [K-02] Review logs and integration — Arjun — Kavach Issue — Medium probability, High impact
-    - [K-04] Complete AI fixes and handover — TPM — Kavach Risk — High probability, Medium impact
-    - [L-01] Dedupe fix — Arjun — Ledger Issue — High probability, High impact
-    - [L-02] Reprioritize resources — TPM — Ledger Risk — High probability, High impact
-  Wednesday
-    - [K-05] Cost analysis — Meera — Kavach Risk — Medium probability, Medium impact
-    - [L-04] Assess scope and effort — TPM — Ledger Change Request — Medium probability, Medium impact
+Critical concerns
+  1. Kavach (Nirmal Finance) is Red. Main problem: Wrong EMI amounts and
+     telecom IP approval risk. Next milestone: UAT Start, due Thursday.
+  2. Ledger (Sagar Publications) is Amber. Main problem: 1200 duplicate
+     customer records in migration. Next milestone: Sprint 4 Completion, due
+     Friday.
+  3. Kavach K-03 (Risk): Telecom IP approval delay. Probability High, impact
+     High. Owner Dev. Action required: Escalate approval. Due Monday.
+  4. Kavach K-01 (Issue): Wrong EMI amount in test calls. Probability High,
+     impact High. Owner Meera. Action required: Root cause analysis. Due
+     Tuesday.
+  5. Ledger L-01 (Issue): 1200 duplicate records. Probability High, impact
+     High. Owner Arjun. Action required: Dedupe fix. Due Tuesday.
+  6. Ledger L-02 (Risk): Kavach work may delay migration fix. Probability
+     High, impact High. Owner TPM. Action required: Reprioritize resources.
+     Due Tuesday.
+  7. Kavach K-02 (Issue): Calls terminate after 40 seconds. Probability
+     Medium, impact High. Owner Arjun. Action required: Review logs and
+     integration. Due Tuesday.
+  8. Ledger L-03 (Issue): Status report not sent. Probability High, impact
+     Medium. Owner TPM. Action required: Send report to COO. Due Monday.
+  9. Kavach K-04 (Risk): Meera on leave before UAT. Probability High, impact
+     Medium. Owner TPM. Action required: Complete AI fixes and handover. Due
+     Tuesday.
 
-Recommended focus
-  1. Mitigate Kavach K-03 before Monday: Telecom IP approval delay
-     (Dev). Probability and impact are both High. It sits in front of
-     UAT Start (Thursday).
-  2. Mitigate Ledger L-02 before Tuesday: Kavach work may delay
-     migration fix (TPM). Probability and impact are both High. It sits
-     in front of Sprint 4 Completion (Friday).
-  3. Mitigate Kavach K-04 before Tuesday: Meera on leave before UAT
-     (TPM). Probability is High and impact is Medium. It sits in front
-     of UAT Start (Thursday).
-  4. Arjun is on Tuesday for both Kavach and Ledger (K-02, L-01).
-     Sequence that work before both slip.
-  5. TPM is on Tuesday for both Kavach and Ledger (K-04, L-02). Sequence
-     that work before both slip.
-  6. Clear Monday first (K-03, L-03). Later due dates depend on that
-     work landing.
+==============================================================================
 
-========================================================================
-
+PROJECT-WISE STATUS
+------------------------------------------------------------------------------
 1. Kavach
 ---------
-Project Name   : Kavach
-Client Name    : Nirmal Finance
-Status         : Red
-Next Milestone : UAT Start (Thursday)
-Main Problem   : Wrong EMI amounts and telecom IP approval risk
-
-Issues
-  Issue ID    : K-01
-  Description : Wrong EMI amount in test calls
-  Owner       : Meera
-  Action      : Root cause analysis
-  Due Date    : Tuesday
-
-  Issue ID    : K-02
-  Description : Calls terminate after 40 seconds
-  Owner       : Arjun
-  Action      : Review logs and integration
-  Due Date    : Tuesday
-
-Risks
-  Risk ID           : K-03
-  Description       : Telecom IP approval delay
-  Probability       : High
-  Impact            : High
-  Owner             : Dev
-  Mitigation Action : Escalate approval
-  Due Date          : Monday
-
-  Risk ID           : K-04
-  Description       : Meera on leave before UAT
-  Probability       : High
-  Impact            : Medium
-  Owner             : TPM
-  Mitigation Action : Complete AI fixes and handover
-  Due Date          : Tuesday
-
-  Risk ID           : K-05
-  Description       : AI cost 40% above budget
-  Probability       : Medium
-  Impact            : Medium
-  Owner             : Meera
-  Mitigation Action : Cost analysis
-  Due Date          : Wednesday
-
-Recommended Actions
-  - [K-03] Escalate approval — Telecom IP approval delay (Risk) | Owner: Dev | Due Date: Monday
-  - [K-01] Root cause analysis — Wrong EMI amount in test calls (Issue) | Owner: Meera | Due Date: Tuesday
-  - [K-02] Review logs and integration — Calls terminate after 40 seconds (Issue) | Owner: Arjun | Due Date: Tuesday
-  - [K-04] Complete AI fixes and handover — Meera on leave before UAT (Risk) | Owner: TPM | Due Date: Tuesday
-  - [K-05] Cost analysis — AI cost 40% above budget (Risk) | Owner: Meera | Due Date: Wednesday
-
-========================================================================
+  Project name       : Kavach
+  Client name        : Nirmal Finance
+  Current status     : Red
+  Progress           : Not recorded
+  Next milestone     : UAT Start
+  Milestone due date : Thursday
+  Main problem       : Wrong EMI amounts and telecom IP approval risk
+  Open issues        : 2
+  Open risks         : 3
+  Other logged items : 0
 
 2. Ledger
 ---------
-Project Name   : Ledger
-Client Name    : Sagar Publications
-Status         : Amber
-Next Milestone : Sprint 4 Completion (Friday)
-Main Problem   : 1200 duplicate customer records in migration
+  Project name       : Ledger
+  Client name        : Sagar Publications
+  Current status     : Amber
+  Progress           : Not recorded
+  Next milestone     : Sprint 4 Completion
+  Milestone due date : Friday
+  Main problem       : 1200 duplicate customer records in migration
+  Open issues        : 2
+  Open risks         : 1
+  Other logged items : 1
 
-Issues
-  Issue ID    : L-01
-  Description : 1200 duplicate records
-  Owner       : Arjun
-  Action      : Dedupe fix
-  Due Date    : Tuesday
+==============================================================================
 
-  Issue ID    : L-03
+ISSUES REGISTER
+------------------------------------------------------------------------------
+Items listed: 4
+
+1.
+  Issue ID        : K-01
+  Project         : Kavach
+  Description     : Wrong EMI amount in test calls
+  Owner           : Meera
+  Priority        : Not recorded
+  Probability     : High
+  Impact          : High
+  Current status  : Not recorded
+  Action required : Root cause analysis
+  Due date        : Tuesday
+
+2.
+  Issue ID        : K-02
+  Project         : Kavach
+  Description     : Calls terminate after 40 seconds
+  Owner           : Arjun
+  Priority        : Not recorded
+  Probability     : Medium
+  Impact          : High
+  Current status  : Not recorded
+  Action required : Review logs and integration
+  Due date        : Tuesday
+
+3.
+  Issue ID        : L-01
+  Project         : Ledger
+  Description     : 1200 duplicate records
+  Owner           : Arjun
+  Priority        : Not recorded
+  Probability     : High
+  Impact          : High
+  Current status  : Not recorded
+  Action required : Dedupe fix
+  Due date        : Tuesday
+
+4.
+  Issue ID        : L-03
+  Project         : Ledger
+  Description     : Status report not sent
+  Owner           : TPM
+  Priority        : Not recorded
+  Probability     : High
+  Impact          : Medium
+  Current status  : Not recorded
+  Action required : Send report to COO
+  Due date        : Monday
+
+==============================================================================
+
+RISK REGISTER
+------------------------------------------------------------------------------
+Items listed: 4
+
+1.
+  Risk ID         : K-03
+  Project         : Kavach
+  Description     : Telecom IP approval delay
+  Probability     : High
+  Impact          : High
+  Owner           : Dev
+  Mitigation plan : Escalate approval
+  Due date        : Monday
+
+2.
+  Risk ID         : K-04
+  Project         : Kavach
+  Description     : Meera on leave before UAT
+  Probability     : High
+  Impact          : Medium
+  Owner           : TPM
+  Mitigation plan : Complete AI fixes and handover
+  Due date        : Tuesday
+
+3.
+  Risk ID         : K-05
+  Project         : Kavach
+  Description     : AI cost 40% above budget
+  Probability     : Medium
+  Impact          : Medium
+  Owner           : Meera
+  Mitigation plan : Cost analysis
+  Due date        : Wednesday
+
+4.
+  Risk ID         : L-02
+  Project         : Ledger
+  Description     : Kavach work may delay migration fix
+  Probability     : High
+  Impact          : High
+  Owner           : TPM
+  Mitigation plan : Reprioritize resources
+  Due date        : Tuesday
+
+==============================================================================
+
+OTHER LOGGED ITEMS
+------------------------------------------------------------------------------
+Items listed: 1
+
+1.
+  ID              : L-04
+  Project         : Ledger
+  Type            : Change Request
+  Description     : WhatsApp birthday campaign request
+  Probability     : Medium
+  Impact          : Medium
+  Owner           : TPM
+  Action required : Assess scope and effort
+  Due date        : Wednesday
+
+==============================================================================
+
+RECOMMENDED ACTIONS
+------------------------------------------------------------------------------
+Each group below is taken from the Action column. An action is an escalation
+when it says escalate. An action is a pending decision when it says assess,
+decide, or approve and it is not already an escalation. Every other logged
+action is listed under Immediate actions, in due-date order. No action row is
+omitted.
+
+Immediate actions
+  1.
+  Item        : [L-03] Ledger Issue
+  Action      : Send report to COO
   Description : Status report not sent
   Owner       : TPM
-  Action      : Send report to COO
-  Due Date    : Monday
+  Due date    : Monday
+  Probability : High
+  Impact      : Medium
 
-Risks
-  Risk ID           : L-02
-  Description       : Kavach work may delay migration fix
-  Probability       : High
-  Impact            : High
-  Owner             : TPM
-  Mitigation Action : Reprioritize resources
-  Due Date          : Tuesday
+  2.
+  Item        : [K-01] Kavach Issue
+  Action      : Root cause analysis
+  Description : Wrong EMI amount in test calls
+  Owner       : Meera
+  Due date    : Tuesday
+  Probability : High
+  Impact      : High
 
-Change Request
-  ID          : L-04
-  Description : WhatsApp birthday campaign request
+  3.
+  Item        : [L-01] Ledger Issue
+  Action      : Dedupe fix
+  Description : 1200 duplicate records
+  Owner       : Arjun
+  Due date    : Tuesday
+  Probability : High
+  Impact      : High
+
+  4.
+  Item        : [L-02] Ledger Risk
+  Action      : Reprioritize resources
+  Description : Kavach work may delay migration fix
+  Owner       : TPM
+  Due date    : Tuesday
+  Probability : High
+  Impact      : High
+
+  5.
+  Item        : [K-02] Kavach Issue
+  Action      : Review logs and integration
+  Description : Calls terminate after 40 seconds
+  Owner       : Arjun
+  Due date    : Tuesday
+  Probability : Medium
+  Impact      : High
+
+  6.
+  Item        : [K-04] Kavach Risk
+  Action      : Complete AI fixes and handover
+  Description : Meera on leave before UAT
+  Owner       : TPM
+  Due date    : Tuesday
+  Probability : High
+  Impact      : Medium
+
+  7.
+  Item        : [K-05] Kavach Risk
+  Action      : Cost analysis
+  Description : AI cost 40% above budget
+  Owner       : Meera
+  Due date    : Wednesday
   Probability : Medium
   Impact      : Medium
-  Owner       : TPM
+
+Pending decisions
+  1.
+  Item        : [L-04] Ledger Change Request
   Action      : Assess scope and effort
-  Due Date    : Wednesday
+  Description : WhatsApp birthday campaign request
+  Owner       : TPM
+  Due date    : Wednesday
+  Probability : Medium
+  Impact      : Medium
 
-Recommended Actions
-  - [L-03] Send report to COO — Status report not sent (Issue) | Owner: TPM | Due Date: Monday
-  - [L-01] Dedupe fix — 1200 duplicate records (Issue) | Owner: Arjun | Due Date: Tuesday
-  - [L-02] Reprioritize resources — Kavach work may delay migration fix (Risk) | Owner: TPM | Due Date: Tuesday
-  - [L-04] Assess scope and effort — WhatsApp birthday campaign request (Change Request) | Owner: TPM | Due Date: Wednesday
+Escalations required
+  1.
+  Item        : [K-03] Kavach Risk
+  Action      : Escalate approval
+  Description : Telecom IP approval delay
+  Owner       : Dev
+  Due date    : Monday
+  Probability : High
+  Impact      : High
 
-========================================================================
+Same-day owner overlap
+  - Arjun has actions on Tuesday for Kavach and Ledger (K-02, L-01).
+  - TPM has actions on Tuesday for Kavach and Ledger (K-04, L-02).
+
+==============================================================================
+
+UPCOMING MILESTONES
+------------------------------------------------------------------------------
+Milestones listed: 2
+
+1. Kavach
+  Project name       : Kavach
+  Client name        : Nirmal Finance
+  Current status     : Red
+  Next milestone     : UAT Start
+  Milestone due date : Thursday
+  Main problem       : Wrong EMI amounts and telecom IP approval risk
+
+2. Ledger
+  Project name       : Ledger
+  Client name        : Sagar Publications
+  Current status     : Amber
+  Next milestone     : Sprint 4 Completion
+  Milestone due date : Friday
+  Main problem       : 1200 duplicate customer records in migration
+
+==============================================================================
+
+END OF REPORT
+Projects 2 | Issues 4 | Risks 4 | Other 1

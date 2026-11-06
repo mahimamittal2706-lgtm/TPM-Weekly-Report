@@ -1,9 +1,8 @@
 """Build a TPM weekly status report from an Excel workbook.
 
 Reads the Summary sheet and the Risk and Issue sheet, then writes
-Weekly_Report.txt. The report opens with an executive summary, then one
-section per project: client, status, next milestone, issues, risks, and
-recommended actions.
+Weekly_Report.txt. Every project, issue, risk, and other logged row is
+included. Fields the tracker does not contain are shown as "Not recorded".
 """
 
 from __future__ import annotations
@@ -11,7 +10,6 @@ from __future__ import annotations
 import argparse
 import sys
 import textwrap
-from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
@@ -42,12 +40,12 @@ RISK_COLUMNS = {
     "due date": "Due Date",
 }
 
-# Rows whose Type is neither Issue nor Risk are still reported, grouped
-# under the type name (for example "Change Request").
+# Printed when the user asked for a field the workbook does not have.
+NOT_RECORDED = "Not recorded"
+
 ISSUE_TYPE = "issue"
 RISK_TYPE = "risk"
 
-# Weekday names used to order due dates that are stored as day names.
 WEEKDAYS = (
     "monday",
     "tuesday",
@@ -57,18 +55,17 @@ WEEKDAYS = (
     "saturday",
     "sunday",
 )
-# Lower rank is more urgent. Unknown severities sort after these.
 SEVERITY_RANK = {"critical": 0, "high": 1, "medium": 2, "low": 3}
-# Portfolio narrative lists these statuses first, then anything else.
-STATUS_ORDER = ("Red", "Amber", "Yellow", "Green")
-LINE_WIDTH = 72
+# Worst status first. Amber and Yellow are the same tier; Amber is listed first.
+HEALTH_ORDER = ("red", "amber", "yellow", "green")
+LINE_WIDTH = 78
 
 
 def parse_args() -> argparse.Namespace:
     """Accept optional workbook and output paths. Defaults sit beside this script."""
     script_dir = Path(__file__).resolve().parent
     parser = argparse.ArgumentParser(
-        description="Generate a TPM weekly report from Summary and Risk and Issue sheets."
+        description="Generate a TPM weekly status report from Summary and Risk and Issue sheets."
     )
     parser.add_argument(
         "--input",
@@ -93,7 +90,6 @@ def load_sheet(workbook: Path, sheet_name: str) -> pd.DataFrame:
     try:
         frame = pd.read_excel(workbook, sheet_name=sheet_name, engine="openpyxl")
     except ValueError as exc:
-        # pandas raises ValueError when the requested sheet is missing.
         raise ValueError(
             f"Sheet '{sheet_name}' was not found in {workbook.name}."
         ) from exc
@@ -104,8 +100,8 @@ def load_sheet(workbook: Path, sheet_name: str) -> pd.DataFrame:
 
 
 def rename_columns(frame: pd.DataFrame, mapping: dict[str, str], sheet_name: str) -> pd.DataFrame:
-    """Rename headers to a stable set and fail if a required column is absent."""
-    lookup = {column.lower(): column for column in frame.columns}
+    """Rename required headers and keep every other column so no tracker field is dropped."""
+    lookup = {str(column).lower(): column for column in frame.columns}
     missing = [canonical for key, canonical in mapping.items() if key not in lookup]
     if missing:
         raise ValueError(
@@ -113,15 +109,20 @@ def rename_columns(frame: pd.DataFrame, mapping: dict[str, str], sheet_name: str
         )
 
     renamed = frame.rename(columns={lookup[key]: canonical for key, canonical in mapping.items()})
-    return renamed.loc[:, list(mapping.values())].copy()
+    ordered = list(mapping.values())
+    extras = [column for column in renamed.columns if column not in ordered]
+    return renamed.loc[:, ordered + extras].copy()
 
 
 def cell_text(value: object) -> str:
     """Turn a cell into display text. Blank cells and NaN become an empty string."""
     if value is None or (isinstance(value, float) and pd.isna(value)):
         return ""
-    if pd.isna(value):
-        return ""
+    try:
+        if pd.isna(value):
+            return ""
+    except TypeError:
+        pass
     if isinstance(value, pd.Timestamp):
         return value.strftime("%d %b %Y")
     text = str(value).strip()
@@ -135,70 +136,16 @@ def project_key(name: object) -> str:
     return cell_text(name).casefold()
 
 
-def format_milestone(milestone: str, milestone_date: str) -> str:
-    """Show the next milestone with its date when the Summary sheet has one."""
-    if milestone and milestone_date:
-        return f"{milestone} ({milestone_date})"
-    return milestone or milestone_date or "Not recorded"
+def column_text(row: pd.Series, column: str) -> str:
+    """Read one column when it exists. A missing column is an empty string."""
+    if column not in row.index:
+        return ""
+    return cell_text(row[column])
 
 
-def field_line(label: str, value: str, width: int) -> str:
-    """One labelled field, padded so values in a block line up."""
-    return f"  {label:<{width}} : {value}"
-
-
-def issue_lines(row: pd.Series) -> list[str]:
-    """Format one issue with id, description, owner, action, and due date."""
-    width = len("Description")
-    return [
-        field_line("Issue ID", cell_text(row["ID"]) or "—", width),
-        field_line("Description", cell_text(row["Description"]) or "No description", width),
-        field_line("Owner", cell_text(row["Owner"]) or "—", width),
-        field_line("Action", cell_text(row["Action"]) or "—", width),
-        field_line("Due Date", cell_text(row["Due Date"]) or "—", width),
-    ]
-
-
-def risk_lines(row: pd.Series) -> list[str]:
-    """Format one risk, including probability and the mitigation action."""
-    width = len("Mitigation Action")
-    return [
-        field_line("Risk ID", cell_text(row["ID"]) or "—", width),
-        field_line("Description", cell_text(row["Description"]) or "No description", width),
-        field_line("Probability", cell_text(row["Probability"]) or "—", width),
-        field_line("Impact", cell_text(row["Impact"]) or "—", width),
-        field_line("Owner", cell_text(row["Owner"]) or "—", width),
-        field_line("Mitigation Action", cell_text(row["Action"]) or "—", width),
-        field_line("Due Date", cell_text(row["Due Date"]) or "—", width),
-    ]
-
-
-def other_lines(row: pd.Series) -> list[str]:
-    """Format a log row that is neither an issue nor a risk."""
-    width = len("Description")
-    return [
-        field_line("ID", cell_text(row["ID"]) or "—", width),
-        field_line("Description", cell_text(row["Description"]) or "No description", width),
-        field_line("Probability", cell_text(row["Probability"]) or "—", width),
-        field_line("Impact", cell_text(row["Impact"]) or "—", width),
-        field_line("Owner", cell_text(row["Owner"]) or "—", width),
-        field_line("Action", cell_text(row["Action"]) or "—", width),
-        field_line("Due Date", cell_text(row["Due Date"]) or "—", width),
-    ]
-
-
-def recommended_action_line(row: pd.Series) -> str | None:
-    """Return one recommended-action line, or None when the Action cell is empty."""
-    action = cell_text(row["Action"])
-    if not action:
-        return None
-    item_id = cell_text(row["ID"]) or "—"
-    kind = cell_text(row["Type"]) or "Item"
-    owner = cell_text(row["Owner"]) or "Unassigned"
-    due = cell_text(row["Due Date"]) or "No due date"
-    description = cell_text(row["Description"])
-    subject = f"{action} — {description}" if description else action
-    return f"  - [{item_id}] {subject} ({kind}) | Owner: {owner} | Due Date: {due}"
+def show(value: str) -> str:
+    """Display text for a requested field. Blank tracker cells stay explicit."""
+    return value if value else NOT_RECORDED
 
 
 def due_rank(due: str) -> tuple:
@@ -210,142 +157,39 @@ def due_rank(due: str) -> tuple:
     parsed = pd.to_datetime(due, errors="coerce", dayfirst=False)
     if pd.notna(parsed):
         return (1, int(parsed.toordinal()), text)
-    if not text or text in {"—", "no due date", "not recorded"}:
+    if not text or text.casefold() in {"—", "no due date", "not recorded"}:
         return (3, 0, text)
     return (2, 0, text)
 
 
 def severity_rank(value: str) -> int:
-    """Map High / Medium / Low onto a sort rank. Blank values sort last."""
+    """Map Critical / High / Medium / Low onto a sort rank. Blank values sort last."""
     return SEVERITY_RANK.get(value.casefold(), len(SEVERITY_RANK))
 
 
-def action_sort_key(row: pd.Series, index: int, project_order: dict[str, int] | None = None) -> tuple:
-    """Order actions by due date, then impact, then portfolio order.
-
-    Blank probability does not demote a row. Issues have no probability, so a
-    blank is treated as equal to the impact and a high-impact issue stays with
-    high-impact risks.
-    """
-    impact = cell_text(row["Impact"])
-    probability = cell_text(row["Probability"])
-    probability_rank = severity_rank(probability) if probability else severity_rank(impact)
-    if project_order is None:
-        project_rank = 0
-    else:
-        project_rank = project_order.get(cell_text(row["Project"]).casefold(), len(project_order))
-    # Project follows the due date so one day's work stays grouped by project.
-    # Impact still orders items inside that project.
-    return (
-        due_rank(cell_text(row["Due Date"])),
-        project_rank,
-        severity_rank(impact),
-        probability_rank,
-        index,
-    )
+def log_type(row: pd.Series) -> str:
+    """Case-folded Type cell, used to tell issues, risks, and other rows apart."""
+    return column_text(row, "Type").casefold()
 
 
-def sorted_log(log_rows: pd.DataFrame, project_order: dict[str, int] | None = None) -> pd.DataFrame:
-    """Return log rows ordered for a week plan. Empty frames pass through."""
-    if log_rows.empty:
-        return log_rows
-    ranked = sorted(
-        enumerate(log_rows.to_dict(orient="records")),
-        key=lambda pair: action_sort_key(pd.Series(pair[1]), pair[0], project_order),
-    )
-    return pd.DataFrame([record for _, record in ranked], columns=log_rows.columns)
-
-
-def wrap_lines(text: str, indent: str = "  ", width: int = LINE_WIDTH) -> list[str]:
-    """Wrap a prose sentence so the executive summary stays inside the rule width."""
-    return textwrap.wrap(
-        text,
-        width=width,
-        initial_indent=indent,
-        subsequent_indent=indent,
-    )
-
-
-def section_block(title: str, rows: pd.DataFrame, formatter) -> list[str]:
-    """Render a labelled list. An empty frame becomes a single 'None' line."""
-    lines = [title]
-    if rows.empty:
-        lines.append("  None")
-        return lines
-    for index, (_, row) in enumerate(rows.iterrows()):
-        if index:
-            lines.append("")
-        lines.extend(formatter(row))
-    return lines
+def split_by_type(log: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Split the log into issues, risks, and every remaining type."""
+    if log.empty:
+        empty = log
+        return empty, empty, empty
+    types = log["Type"].map(lambda value: cell_text(value).casefold())
+    issues = log.loc[types == ISSUE_TYPE]
+    risks = log.loc[types == RISK_TYPE]
+    other = log.loc[~types.isin([ISSUE_TYPE, RISK_TYPE])]
+    return issues, risks, other
 
 
 def rows_for_project(log: pd.DataFrame, key: str) -> pd.DataFrame:
-    """Filter the risk log to one project, preserving sheet order."""
+    """Filter the log to one project, preserving sheet order."""
     if log.empty:
         return log
     mask = log["Project"].map(project_key) == key
     return log.loc[mask]
-
-
-def build_project_section(summary_row: pd.Series | None, log_rows: pd.DataFrame, fallback_name: str) -> list[str]:
-    """Assemble the weekly block for a single project."""
-    if summary_row is None:
-        project_name = fallback_name
-        client = "Not recorded"
-        status = "Not recorded"
-        milestone = "Not recorded"
-        main_problem = "Not recorded"
-    else:
-        project_name = cell_text(summary_row["Project"]) or fallback_name
-        client = cell_text(summary_row["Client"]) or "Not recorded"
-        status = cell_text(summary_row["Status"]) or "Not recorded"
-        milestone = format_milestone(
-            cell_text(summary_row["Next Milestone"]),
-            cell_text(summary_row["Date"]),
-        )
-        main_problem = cell_text(summary_row["Main Problem"]) or "Not recorded"
-
-    label_width = len("Next Milestone")
-    lines = [
-        field_line("Project Name", project_name, label_width).lstrip(),
-        field_line("Client Name", client, label_width).lstrip(),
-        field_line("Status", status, label_width).lstrip(),
-        field_line("Next Milestone", milestone, label_width).lstrip(),
-        field_line("Main Problem", main_problem, label_width).lstrip(),
-        "",
-    ]
-
-    # Split the log by Type. Comparison is case-insensitive.
-    type_key = log_rows["Type"].map(lambda value: cell_text(value).casefold()) if not log_rows.empty else pd.Series(dtype=str)
-    issues = log_rows.loc[type_key == ISSUE_TYPE] if not log_rows.empty else log_rows
-    risks = log_rows.loc[type_key == RISK_TYPE] if not log_rows.empty else log_rows
-    other = log_rows.loc[~type_key.isin([ISSUE_TYPE, RISK_TYPE])] if not log_rows.empty else log_rows
-
-    lines.extend(section_block("Issues", issues, issue_lines))
-    lines.append("")
-    lines.extend(section_block("Risks", risks, risk_lines))
-    lines.append("")
-
-    # Keep change requests and any other types visible instead of dropping them.
-    if not other.empty:
-        for type_name, group in other.groupby(other["Type"].map(cell_text), sort=False):
-            heading = type_name or "Other"
-            lines.extend(section_block(heading, group, other_lines))
-            lines.append("")
-
-    lines.append("Recommended Actions")
-    # Week order: Monday actions before Tuesday, high impact before low.
-    actions = [
-        line
-        for line in (recommended_action_line(row) for _, row in sorted_log(log_rows).iterrows())
-        if line
-    ]
-    if actions:
-        lines.extend(actions)
-    else:
-        lines.append("  None")
-
-    return lines
 
 
 def ordered_projects(summary: pd.DataFrame, log: pd.DataFrame) -> list[tuple[str, str, pd.Series | None]]:
@@ -361,28 +205,16 @@ def ordered_projects(summary: pd.DataFrame, log: pd.DataFrame) -> list[tuple[str
         seen.add(key)
         projects.append((key, name, row))
 
-    for _, row in log.iterrows():
-        name = cell_text(row["Project"])
-        key = project_key(name)
-        if not key or key in seen:
-            continue
-        seen.add(key)
-        projects.append((key, name, None))
+    if not log.empty:
+        for _, row in log.iterrows():
+            name = cell_text(row["Project"])
+            key = project_key(name)
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            projects.append((key, name, None))
 
     return projects
-
-
-@dataclass
-class ProjectBrief:
-    """Fields the executive summary needs from one project, already display-ready."""
-
-    name: str
-    client: str
-    status: str
-    milestone: str
-    main_problem: str
-    issue_count: int
-    risk_count: int
 
 
 def count_phrase(count: int, singular: str) -> str:
@@ -403,372 +235,660 @@ def join_names(names: list[str]) -> str:
     return ", ".join(names[:-1]) + f", and {names[-1]}"
 
 
-def log_type(row: pd.Series) -> str:
-    """Case-folded Type cell, used to tell issues, risks, and other rows apart."""
-    return cell_text(row["Type"]).casefold()
+def health_rank(status: str) -> int:
+    """Lower rank is a weaker RAG status. Unrecognised statuses sort after Green."""
+    folded = status.casefold()
+    if folded in HEALTH_ORDER:
+        return HEALTH_ORDER.index(folded)
+    if folded in {"", "not recorded"}:
+        return len(HEALTH_ORDER) + 1
+    return len(HEALTH_ORDER)
 
 
-def split_counts(log_rows: pd.DataFrame) -> tuple[int, int]:
-    """Return issue and risk counts for one project, or for the whole log."""
-    if log_rows.empty:
-        return 0, 0
-    types = log_rows["Type"].map(lambda value: cell_text(value).casefold())
-    return int((types == ISSUE_TYPE).sum()), int((types == RISK_TYPE).sum())
+def overall_health(statuses: list[str]) -> str:
+    """Portfolio health is the weakest recorded RAG status."""
+    recorded = [status for status in statuses if status and status.casefold() != "not recorded"]
+    if not recorded:
+        return NOT_RECORDED
+    worst = min(recorded, key=health_rank)
+    canonical = {"red": "Red", "amber": "Amber", "yellow": "Yellow", "green": "Green"}
+    return canonical.get(worst.casefold(), worst)
 
 
-def make_brief(name: str, summary_row: pd.Series | None, log_rows: pd.DataFrame) -> ProjectBrief:
-    """Collect the summary fields and open-item counts for one project."""
-    if summary_row is None:
-        client = "Not recorded"
-        status = "Not recorded"
-        milestone = "Not recorded"
-        main_problem = "Not recorded"
-    else:
-        client = cell_text(summary_row["Client"]) or "Not recorded"
-        status = cell_text(summary_row["Status"]) or "Not recorded"
-        milestone = format_milestone(
-            cell_text(summary_row["Next Milestone"]),
-            cell_text(summary_row["Date"]),
-        )
-        main_problem = cell_text(summary_row["Main Problem"]) or "Not recorded"
-    issue_count, risk_count = split_counts(log_rows)
-    return ProjectBrief(
-        name=name,
-        client=client,
-        status=status,
-        milestone=milestone,
-        main_problem=main_problem,
-        issue_count=issue_count,
-        risk_count=risk_count,
-    )
+def is_elevated(row: pd.Series) -> bool:
+    """High impact, or high probability with medium-or-higher impact, from logged cells."""
+    impact = severity_rank(column_text(row, "Impact"))
+    probability = severity_rank(column_text(row, "Probability"))
+    if impact <= SEVERITY_RANK["high"]:
+        return True
+    return probability <= SEVERITY_RANK["high"] and impact <= SEVERITY_RANK["medium"]
 
 
-def exposure_phrase(row: pd.Series) -> str:
-    """Short probability and impact note for the week-at-a-glance list."""
-    probability = cell_text(row["Probability"])
-    impact = cell_text(row["Impact"])
-    parts = []
-    if probability:
-        parts.append(f"{probability} probability")
-    if impact:
-        parts.append(f"{impact} impact")
-    return ", ".join(parts)
+def is_escalation(action: str) -> bool:
+    """True when the logged action itself says to escalate."""
+    return "escalat" in action.casefold()
 
 
-def other_items_phrase(log: pd.DataFrame) -> str:
-    """Trailing clause for change requests and any other non-issue, non-risk rows."""
-    if log.empty:
-        return ""
-    types = log["Type"].map(lambda value: cell_text(value).casefold())
-    other = log.loc[~types.isin([ISSUE_TYPE, RISK_TYPE])]
-    if other.empty:
-        return ""
-    labels = []
-    for label in other["Type"].map(cell_text):
-        if label and label not in labels:
-            labels.append(label)
-    if len(labels) == 1:
-        return f", plus {count_phrase(len(other), labels[0].lower())}"
-    return f", plus {count_phrase(len(other), 'other item')}"
+def is_pending_decision(action: str) -> bool:
+    """True when the logged action is to assess, decide, or obtain approval."""
+    text = action.casefold()
+    markers = ("assess", "decide", "decision", "approve", "approval")
+    return any(marker in text for marker in markers)
 
 
-def portfolio_headline(briefs: list[ProjectBrief], log: pd.DataFrame, issue_count: int, risk_count: int) -> str:
-    """Opening line: each project's status and next milestone, then the open-item count."""
-    if not briefs:
-        return "No projects were found in the workbook."
-
-    # Red before Amber before Green, stable within a status so Summary order holds.
-    status_rank = {name.casefold(): index for index, name in enumerate(STATUS_ORDER)}
-    ordered = sorted(
-        enumerate(briefs),
-        key=lambda pair: (status_rank.get(pair[1].status.casefold(), len(STATUS_ORDER)), pair[0]),
-    )
-    clauses = []
-    for _, brief in ordered:
-        client = f" ({brief.client})" if brief.client != "Not recorded" else ""
-        if brief.milestone and brief.milestone != "Not recorded":
-            clauses.append(f"{brief.name}{client} is {brief.status} ahead of {brief.milestone}")
-        else:
-            clauses.append(f"{brief.name}{client} is {brief.status}")
-
-    opening = join_names(clauses)
-    opening = opening[0].upper() + opening[1:]
-    return (
-        f"{opening}. "
-        f"{count_phrase(issue_count, 'issue').capitalize()} and {count_phrase(risk_count, 'risk')} "
-        f"are open{other_items_phrase(log)}."
-    )
+def classify_action(action: str) -> str:
+    """Bucket a logged action. Escalation wins when the wording matches both rules."""
+    if is_escalation(action):
+        return "escalation"
+    if is_pending_decision(action):
+        return "decision"
+    return "immediate"
 
 
-def highest_risk_sentence(log_rows: pd.DataFrame) -> str:
-    """Name the risk with the highest impact, then probability, then the nearest due date."""
-    if log_rows.empty:
-        return ""
-    risks = [row for _, row in log_rows.iterrows() if log_type(row) == RISK_TYPE]
-    if not risks:
-        return ""
-    row = min(
-        risks,
-        key=lambda item: (
-            severity_rank(cell_text(item["Impact"])),
-            severity_rank(cell_text(item["Probability"])),
-            due_rank(cell_text(item["Due Date"])),
-        ),
-    )
-    item_id = cell_text(row["ID"]) or "—"
-    description = cell_text(row["Description"]) or "an open risk"
-    owner = cell_text(row["Owner"]) or "Unassigned"
-    due = cell_text(row["Due Date"]) or "no due date"
-    exposure = exposure_phrase(row)
-    detail = f"{owner}, {due}"
-    if exposure:
-        detail = f"{detail}; {exposure}"
-    return f"Highest exposure is {item_id}, {description} ({detail})."
+def rule(title: str) -> list[str]:
+    """A major section heading and its underline."""
+    return [title, "-" * LINE_WIDTH]
 
 
-def project_paragraph(brief: ProjectBrief, log_rows: pd.DataFrame) -> str:
-    """Main problem, the top risk, and how many items are open on this project."""
-    if brief.main_problem and brief.main_problem != "Not recorded":
-        sentence = f"{brief.name}: {brief.main_problem}."
-    else:
-        sentence = f"{brief.name} has no main problem recorded."
-    risk = highest_risk_sentence(log_rows)
-    if risk:
-        sentence += f" {risk}"
-    sentence += (
-        f" Open this week: {count_phrase(brief.issue_count, 'issue')} and "
-        f"{count_phrase(brief.risk_count, 'risk')}."
-    )
-    return sentence
+def wrap_text(text: str, indent: str = "", subsequent: str | None = None) -> list[str]:
+    """Wrap prose to the report width."""
+    return textwrap.wrap(
+        text,
+        width=LINE_WIDTH,
+        initial_indent=indent,
+        subsequent_indent=indent if subsequent is None else subsequent,
+    ) or [indent.rstrip()]
 
 
-def week_at_a_glance(log: pd.DataFrame, project_order: dict[str, int] | None = None) -> list[str]:
-    """Actions grouped by due date, Monday first, high impact before low impact."""
-    lines = ["Week at a glance"]
-    if log.empty:
-        lines.append("  None")
-        return lines
-
-    groups: list[tuple[str, list[pd.Series]]] = []
-    index_by_due: dict[str, int] = {}
-    for _, row in sorted_log(log, project_order).iterrows():
-        if not cell_text(row["Action"]):
-            continue
-        label = cell_text(row["Due Date"]) or "No due date"
-        key = label.casefold()
-        if key not in index_by_due:
-            index_by_due[key] = len(groups)
-            groups.append((label, []))
-        groups[index_by_due[key]][1].append(row)
-
-    if not groups:
-        lines.append("  None")
-        return lines
-
-    for label, rows in groups:
-        lines.append(f"  {label}")
-        for row in rows:
-            item_id = cell_text(row["ID"]) or "—"
-            action = cell_text(row["Action"])
-            owner = cell_text(row["Owner"]) or "Unassigned"
-            project = cell_text(row["Project"]) or "—"
-            kind = cell_text(row["Type"]) or "Item"
-            detail = f"    - [{item_id}] {action} — {owner} — {project} {kind}"
-            exposure = exposure_phrase(row)
-            if exposure:
-                detail += f" — {exposure}"
-            lines.append(detail)
+def field_block(pairs: list[tuple[str, str]]) -> list[str]:
+    """Align labelled fields and wrap long values under the value column."""
+    if not pairs:
+        return []
+    width = max(len(label) for label, _ in pairs)
+    lines: list[str] = []
+    for label, value in pairs:
+        shown = show(value)
+        prefix = f"  {label:<{width}} : "
+        wrapped = textwrap.wrap(shown, width=max(24, LINE_WIDTH - len(prefix))) or [shown]
+        lines.append(prefix + wrapped[0])
+        hang = " " * len(prefix)
+        for extra in wrapped[1:]:
+            lines.append(hang + extra)
     return lines
 
 
-def owner_conflicts(log: pd.DataFrame, project_order: dict[str, int] | None = None) -> list[str]:
-    """Owners who have actions on two projects with the same due date."""
+def extra_pairs(row: pd.Series, consumed: set[str]) -> list[tuple[str, str]]:
+    """Any tracker column that is not already printed, when the cell has a value."""
+    pairs = []
+    for column in row.index:
+        if column in consumed:
+            continue
+        text = cell_text(row[column])
+        if text:
+            pairs.append((str(column), text))
+    return pairs
+
+
+def exposure_text(row: pd.Series) -> str:
+    """Probability and impact exactly as stored."""
+    parts = []
+    probability = column_text(row, "Probability")
+    impact = column_text(row, "Impact")
+    if probability:
+        parts.append(f"probability {probability}")
+    if impact:
+        parts.append(f"impact {impact}")
+    return ", ".join(parts)
+
+
+def project_fields(name: str, summary_row: pd.Series | None) -> dict[str, str]:
+    """Display fields for one project. Missing summary cells stay 'Not recorded'."""
+    if summary_row is None:
+        return {
+            "name": name,
+            "client": "",
+            "status": "",
+            "progress": "",
+            "milestone": "",
+            "milestone_date": "",
+            "main_problem": "",
+        }
+    return {
+        "name": cell_text(summary_row["Project"]) or name,
+        "client": cell_text(summary_row["Client"]),
+        "status": cell_text(summary_row["Status"]),
+        "progress": column_text(summary_row, "Progress"),
+        "milestone": cell_text(summary_row["Next Milestone"]),
+        "milestone_date": cell_text(summary_row["Date"]),
+        "main_problem": cell_text(summary_row["Main Problem"]),
+    }
+
+
+def summary_extra_pairs(summary_row: pd.Series | None) -> list[tuple[str, str]]:
+    """Summary columns beyond the standard set, so a new tracker column is still printed."""
+    if summary_row is None:
+        return []
+    consumed = {
+        "Project",
+        "Client",
+        "Status",
+        "Next Milestone",
+        "Date",
+        "Main Problem",
+        "Progress",
+    }
+    return extra_pairs(summary_row, consumed)
+
+
+def build_executive_summary(
+    projects: list[tuple[str, str, pd.Series | None]],
+    log: pd.DataFrame,
+) -> list[str]:
+    """Counts, portfolio health, and critical concerns drawn from tracker cells."""
+    issues, risks, other = split_by_type(log)
+    fields = [project_fields(name, row) for _, name, row in projects]
+    statuses = [item["status"] for item in fields]
+    health = overall_health(statuses)
+
+    lines = rule("EXECUTIVE SUMMARY")
+    lines.extend(
+        field_block(
+            [
+                ("Total projects", str(len(projects))),
+                ("Overall project health", health),
+                ("Total open issues", str(len(issues))),
+                ("Total risks", str(len(risks))),
+            ]
+        )
+    )
+    lines.append("")
+
+    if fields:
+        status_bits = []
+        for item in fields:
+            client = f" ({item['client']})" if item["client"] else ""
+            status_bits.append(f"{item['name']}{client} is {show(item['status'])}")
+        health_sentence = (
+            f"Portfolio health is {health}. {join_names(status_bits)}. "
+            f"The open log holds {count_phrase(len(issues), 'issue')} and "
+            f"{count_phrase(len(risks), 'risk')}"
+        )
+        if not other.empty:
+            labels = []
+            for label in other["Type"].map(cell_text):
+                shown = label or "untyped item"
+                if shown not in labels:
+                    labels.append(shown)
+            health_sentence += f", plus {count_phrase(len(other), labels[0] if len(labels) == 1 else 'other item')}"
+        health_sentence += (
+            ". Issue rows are counted as open because the tracker has no closed flag "
+            "and no issue-status column. Progress and issue priority are not in the tracker."
+        )
+        lines.extend(wrap_text(health_sentence))
+        lines.append("")
+
+    lines.append("Critical concerns")
+    concerns = critical_concerns(fields, issues, risks)
+    if not concerns:
+        lines.append("  None recorded in the tracker.")
+    else:
+        for number, text in enumerate(concerns, start=1):
+            prefix = f"  {number}. "
+            lines.extend(
+                textwrap.wrap(
+                    text,
+                    width=LINE_WIDTH,
+                    initial_indent=prefix,
+                    subsequent_indent=" " * len(prefix),
+                )
+            )
+    return lines
+
+
+def critical_concerns(
+    fields: list[dict[str, str]],
+    issues: pd.DataFrame,
+    risks: pd.DataFrame,
+) -> list[str]:
+    """Red, Amber, and Yellow projects, then elevated issues and risks."""
+    concerns = []
+    for item in fields:
+        if health_rank(item["status"]) > HEALTH_ORDER.index("yellow"):
+            continue
+        milestone = item["milestone"] or NOT_RECORDED
+        due = item["milestone_date"] or NOT_RECORDED
+        client = item["client"] or NOT_RECORDED
+        problem = item["main_problem"] or NOT_RECORDED
+        concerns.append(
+            f"{item['name']} ({client}) is {item['status']}. "
+            f"Main problem: {problem}. Next milestone: {milestone}, due {due}."
+        )
+
+    elevated_rows = []
+    for frame in (issues, risks):
+        if frame.empty:
+            continue
+        for index, (_, row) in enumerate(frame.iterrows()):
+            if is_elevated(row):
+                elevated_rows.append((row, index))
+
+    elevated_rows.sort(
+        key=lambda pair: (
+            severity_rank(column_text(pair[0], "Impact")),
+            severity_rank(column_text(pair[0], "Probability")),
+            due_rank(column_text(pair[0], "Due Date")),
+            pair[1],
+        )
+    )
+    for row, _ in elevated_rows:
+        item_id = column_text(row, "ID") or "—"
+        project = column_text(row, "Project") or "Unassigned project"
+        kind = column_text(row, "Type") or "Item"
+        description = column_text(row, "Description") or "No description"
+        owner = column_text(row, "Owner") or "Unassigned"
+        action = column_text(row, "Action") or "no action recorded"
+        due = column_text(row, "Due Date") or "no due date"
+        exposure = exposure_text(row) or "severity not recorded"
+        exposure = exposure[0].upper() + exposure[1:]
+        concerns.append(
+            f"{project} {item_id} ({kind}): {description}. {exposure}. "
+            f"Owner {owner}. Action required: {action}. Due {due}."
+        )
+    return concerns
+
+
+def build_project_status(projects: list[tuple[str, str, pd.Series | None]], log: pd.DataFrame) -> list[str]:
+    """One block per project, including projects that appear only on the log."""
+    lines = rule("PROJECT-WISE STATUS")
+    if not projects:
+        lines.append("No projects were found in the workbook.")
+        return lines
+
+    for index, (key, name, summary_row) in enumerate(projects, start=1):
+        if index > 1:
+            lines.append("")
+        item = project_fields(name, summary_row)
+        project_rows = rows_for_project(log, key)
+        issues, risks, other = split_by_type(project_rows)
+        heading = f"{index}. {item['name']}"
+        lines.append(heading)
+        lines.append("-" * len(heading))
+        pairs = [
+            ("Project name", item["name"]),
+            ("Client name", item["client"]),
+            ("Current status", item["status"]),
+            ("Progress", item["progress"]),
+            ("Next milestone", item["milestone"]),
+            ("Milestone due date", item["milestone_date"]),
+            ("Main problem", item["main_problem"]),
+            ("Open issues", str(len(issues))),
+            ("Open risks", str(len(risks))),
+            ("Other logged items", str(len(other))),
+        ]
+        pairs.extend(summary_extra_pairs(summary_row))
+        lines.extend(field_block(pairs))
+    return lines
+
+
+def issue_pairs(row: pd.Series) -> list[tuple[str, str]]:
+    """Every issue field requested, plus severity columns that exist on the log."""
+    pairs = [
+        ("Issue ID", column_text(row, "ID")),
+        ("Project", column_text(row, "Project")),
+        ("Description", column_text(row, "Description")),
+        ("Owner", column_text(row, "Owner")),
+        ("Priority", column_text(row, "Priority")),
+        ("Probability", column_text(row, "Probability")),
+        ("Impact", column_text(row, "Impact")),
+        ("Current status", column_text(row, "Item Status") or column_text(row, "Status")),
+        ("Action required", column_text(row, "Action")),
+        ("Due date", column_text(row, "Due Date")),
+    ]
+    pairs.extend(
+        extra_pairs(
+            row,
+            {
+                "ID",
+                "Project",
+                "Type",
+                "Description",
+                "Owner",
+                "Priority",
+                "Probability",
+                "Impact",
+                "Item Status",
+                "Status",
+                "Action",
+                "Due Date",
+            },
+        )
+    )
+    return pairs
+
+
+def risk_pairs(row: pd.Series) -> list[tuple[str, str]]:
+    """Every risk field requested, plus the project so the row stays traceable."""
+    pairs = [
+        ("Risk ID", column_text(row, "ID")),
+        ("Project", column_text(row, "Project")),
+        ("Description", column_text(row, "Description")),
+        ("Probability", column_text(row, "Probability")),
+        ("Impact", column_text(row, "Impact")),
+        ("Owner", column_text(row, "Owner")),
+        ("Mitigation plan", column_text(row, "Action")),
+        ("Due date", column_text(row, "Due Date")),
+    ]
+    pairs.extend(
+        extra_pairs(
+            row,
+            {
+                "ID",
+                "Project",
+                "Type",
+                "Description",
+                "Probability",
+                "Impact",
+                "Owner",
+                "Action",
+                "Due Date",
+            },
+        )
+    )
+    return pairs
+
+
+def other_pairs(row: pd.Series) -> list[tuple[str, str]]:
+    """A log row that is neither an issue nor a risk, with every stored column."""
+    pairs = [
+        ("ID", column_text(row, "ID")),
+        ("Project", column_text(row, "Project")),
+        ("Type", column_text(row, "Type")),
+        ("Description", column_text(row, "Description")),
+        ("Probability", column_text(row, "Probability")),
+        ("Impact", column_text(row, "Impact")),
+        ("Owner", column_text(row, "Owner")),
+        ("Action required", column_text(row, "Action")),
+        ("Due date", column_text(row, "Due Date")),
+    ]
+    pairs.extend(
+        extra_pairs(
+            row,
+            {
+                "ID",
+                "Project",
+                "Type",
+                "Description",
+                "Probability",
+                "Impact",
+                "Owner",
+                "Action",
+                "Due Date",
+            },
+        )
+    )
+    return pairs
+
+
+def render_register(title: str, rows: pd.DataFrame, formatter, empty_line: str) -> list[str]:
+    """A full register in sheet order. Empty registers say so instead of being omitted."""
+    lines = rule(title)
+    if rows.empty:
+        lines.append(empty_line)
+        return lines
+    lines.append(f"Items listed: {len(rows)}")
+    lines.append("")
+    for index, (_, row) in enumerate(rows.iterrows(), start=1):
+        if index > 1:
+            lines.append("")
+        lines.append(f"{index}.")
+        lines.extend(field_block(formatter(row)))
+    return lines
+
+
+def action_entry(row: pd.Series) -> list[str]:
+    """One recommended action with the tracker fields needed to act on it."""
+    kind = column_text(row, "Type") or "Item"
+    item_id = column_text(row, "ID") or "—"
+    project = column_text(row, "Project") or "Unassigned project"
+    action = column_text(row, "Action") or "No action recorded"
+    pairs = [
+        ("Item", f"[{item_id}] {project} {kind}"),
+        ("Action", action),
+        ("Description", column_text(row, "Description")),
+        ("Owner", column_text(row, "Owner")),
+        ("Due date", column_text(row, "Due Date")),
+        ("Probability", column_text(row, "Probability")),
+        ("Impact", column_text(row, "Impact")),
+    ]
+    return field_block(pairs)
+
+
+def sort_actions(rows: list[pd.Series]) -> list[pd.Series]:
+    """Due date, then impact, then probability. Original order breaks remaining ties."""
+    ranked = sorted(
+        enumerate(rows),
+        key=lambda pair: (
+            due_rank(column_text(pair[1], "Due Date")),
+            severity_rank(column_text(pair[1], "Impact")),
+            severity_rank(column_text(pair[1], "Probability")),
+            pair[0],
+        ),
+    )
+    return [row for _, row in ranked]
+
+
+def render_action_group(title: str, rows: list[pd.Series], empty_line: str) -> list[str]:
+    """One recommended-action subsection."""
+    lines = [title]
+    if not rows:
+        lines.append(f"  {empty_line}")
+        return lines
+    for index, row in enumerate(sort_actions(rows), start=1):
+        if index > 1:
+            lines.append("")
+        lines.append(f"  {index}.")
+        lines.extend(action_entry(row))
+    return lines
+
+
+def owner_overlaps(log: pd.DataFrame) -> list[str]:
+    """Owners with logged actions on two projects that share a due date."""
     if log.empty:
         return []
-
     buckets: dict[tuple[str, str], list[pd.Series]] = {}
     order: list[tuple[str, str]] = []
-    for _, row in sorted_log(log, project_order).iterrows():
-        owner = cell_text(row["Owner"])
-        if not cell_text(row["Action"]) or not owner:
+    for _, row in log.iterrows():
+        owner = column_text(row, "Owner")
+        if not column_text(row, "Action") or not owner:
             continue
-        due = cell_text(row["Due Date"]) or "No due date"
+        due = column_text(row, "Due Date") or "No due date"
         key = (owner.casefold(), due.casefold())
         if key not in buckets:
             buckets[key] = []
             order.append(key)
         buckets[key].append(row)
 
-    conflicts = []
+    overlaps = []
     for key in order:
         rows = buckets[key]
         projects: list[str] = []
         for row in rows:
-            project = cell_text(row["Project"])
+            project = column_text(row, "Project")
             if project and project not in projects:
                 projects.append(project)
         if len(projects) < 2:
             continue
-        owner = cell_text(rows[0]["Owner"])
-        due = cell_text(rows[0]["Due Date"]) or "No due date"
-        ids = ", ".join(cell_text(row["ID"]) or "—" for row in rows)
-        conflicts.append(
-            f"{owner} is on {due} for both {join_names(projects)} ({ids}). Sequence that work before both slip."
+        owner = column_text(rows[0], "Owner")
+        due = column_text(rows[0], "Due Date") or "No due date"
+        ids = ", ".join(column_text(row, "ID") or "—" for row in rows)
+        overlaps.append(
+            f"{owner} has actions on {due} for {join_names(projects)} ({ids})."
         )
-    return conflicts
+    return overlaps
 
 
-def milestone_for(project: str, briefs: list[ProjectBrief]) -> str:
-    """Next milestone for a project name, or an empty string when none is recorded."""
-    for brief in briefs:
-        if brief.name.casefold() == project.casefold() and brief.milestone != "Not recorded":
-            return brief.milestone
-    return ""
-
-
-def elevated_risk_bullets(log: pd.DataFrame, briefs: list[ProjectBrief]) -> list[str]:
-    """Risks with high probability and medium or high impact, highest exposure first."""
-    if log.empty:
-        return []
-    bullets = []
-    for _, row in sorted_log(log).iterrows():
-        if log_type(row) != RISK_TYPE:
-            continue
-        probability = cell_text(row["Probability"])
-        impact = cell_text(row["Impact"])
-        if severity_rank(probability) > SEVERITY_RANK["high"]:
-            continue
-        if severity_rank(impact) > SEVERITY_RANK["medium"]:
-            continue
-        item_id = cell_text(row["ID"]) or "—"
-        project = cell_text(row["Project"]) or "the portfolio"
-        description = cell_text(row["Description"]) or "an open risk"
-        owner = cell_text(row["Owner"]) or "Unassigned"
-        due = cell_text(row["Due Date"]) or "no due date"
-        if severity_rank(impact) <= SEVERITY_RANK["high"]:
-            exposure = "Probability and impact are both High."
-        else:
-            exposure = f"Probability is High and impact is {impact}."
-        milestone = milestone_for(project, briefs)
-        timing = f" It sits in front of {milestone}." if milestone else ""
-        bullets.append(
-            f"Mitigate {project} {item_id} before {due}: {description} ({owner}). {exposure}{timing}"
+def build_recommended_actions(log: pd.DataFrame) -> list[str]:
+    """Split logged actions into immediate work, decisions, and escalations."""
+    lines = rule("RECOMMENDED ACTIONS")
+    lines.extend(
+        wrap_text(
+            "Each group below is taken from the Action column. "
+            "An action is an escalation when it says escalate. "
+            "An action is a pending decision when it says assess, decide, or approve "
+            "and it is not already an escalation. "
+            "Every other logged action is listed under Immediate actions, in due-date order. "
+            "No action row is omitted."
         )
-    return bullets
+    )
+    lines.append("")
 
+    immediate: list[pd.Series] = []
+    decisions: list[pd.Series] = []
+    escalations: list[pd.Series] = []
+    if not log.empty:
+        for _, row in log.iterrows():
+            action = column_text(row, "Action")
+            if not action:
+                immediate.append(row)
+                continue
+            bucket = classify_action(action)
+            if bucket == "escalation":
+                escalations.append(row)
+            elif bucket == "decision":
+                decisions.append(row)
+            else:
+                immediate.append(row)
 
-def earliest_due_bullet(log: pd.DataFrame, project_order: dict[str, int] | None = None) -> str | None:
-    """Point at the first due date so Monday work is not buried under later items."""
-    if log.empty:
-        return None
-    first_due = ""
-    ids: list[str] = []
-    for _, row in sorted_log(log, project_order).iterrows():
-        if not cell_text(row["Action"]):
-            continue
-        due = cell_text(row["Due Date"]) or "No due date"
-        if not first_due:
-            first_due = due
-        if due.casefold() != first_due.casefold():
-            break
-        ids.append(cell_text(row["ID"]) or "—")
-    if not first_due or not ids:
-        return None
-    return f"Clear {first_due} first ({', '.join(ids)}). Later due dates depend on that work landing."
-
-
-def focus_bullets(
-    log: pd.DataFrame,
-    briefs: list[ProjectBrief],
-    project_order: dict[str, int] | None = None,
-) -> list[str]:
-    """The few actions leadership should track, capped so the summary stays short."""
-    bullets = elevated_risk_bullets(log, briefs)
-    bullets.extend(owner_conflicts(log, project_order))
-    earliest = earliest_due_bullet(log, project_order)
-    if earliest:
-        bullets.append(earliest)
-    if not bullets:
-        return ["No high-exposure risks or cross-project clashes are open. Work actions in due-date order."]
-    return bullets[:6]
-
-
-def wrap_bullet(number: int, text: str) -> list[str]:
-    """Wrap a numbered focus item so continuation lines line up under the text."""
-    prefix = f"  {number}. "
-    return textwrap.wrap(
-        text,
-        width=LINE_WIDTH,
-        initial_indent=prefix,
-        subsequent_indent=" " * len(prefix),
+    lines.extend(
+        render_action_group(
+            "Immediate actions",
+            immediate,
+            "None recorded in the tracker.",
+        )
+    )
+    lines.append("")
+    lines.extend(
+        render_action_group(
+            "Pending decisions",
+            decisions,
+            "None recorded in the tracker.",
+        )
+    )
+    lines.append("")
+    lines.extend(
+        render_action_group(
+            "Escalations required",
+            escalations,
+            "None recorded in the tracker.",
+        )
     )
 
-
-def build_executive_summary(
-    briefs: list[ProjectBrief],
-    log: pd.DataFrame,
-    issue_count: int,
-    risk_count: int,
-) -> list[str]:
-    """Portfolio headline, one paragraph per project, the week plan, and focus items."""
-    lines = ["EXECUTIVE SUMMARY", "-" * LINE_WIDTH]
-    lines.extend(wrap_lines(portfolio_headline(briefs, log, issue_count, risk_count), indent=""))
-    lines.append("")
-
-    if briefs:
-        lines.append("Portfolio")
-        for brief in briefs:
-            project_rows = rows_for_project(log, brief.name.casefold())
-            lines.extend(wrap_lines(project_paragraph(brief, project_rows)))
+    overlaps = owner_overlaps(log)
+    if overlaps:
         lines.append("")
+        lines.append("Same-day owner overlap")
+        for text in overlaps:
+            lines.extend(wrap_text(text, indent="  - ", subsequent="    "))
+    return lines
 
-    project_order = {brief.name.casefold(): index for index, brief in enumerate(briefs)}
-    lines.extend(week_at_a_glance(log, project_order))
+
+def build_milestones(projects: list[tuple[str, str, pd.Series | None]]) -> list[str]:
+    """Upcoming milestones in due-date order, one block per project."""
+    lines = rule("UPCOMING MILESTONES")
+    if not projects:
+        lines.append("No projects were found in the workbook.")
+        return lines
+
+    ranked = sorted(
+        enumerate(project_fields(name, row) for _, name, row in projects),
+        key=lambda pair: (due_rank(pair[1]["milestone_date"]), pair[0]),
+    )
+    lines.append(f"Milestones listed: {len(ranked)}")
     lines.append("")
-    lines.append("Recommended focus")
-    for number, bullet in enumerate(focus_bullets(log, briefs, project_order), start=1):
-        lines.extend(wrap_bullet(number, bullet))
+    for position, (_, item) in enumerate(ranked, start=1):
+        if position > 1:
+            lines.append("")
+        lines.append(f"{position}. {item['name']}")
+        lines.extend(
+            field_block(
+                [
+                    ("Project name", item["name"]),
+                    ("Client name", item["client"]),
+                    ("Current status", item["status"]),
+                    ("Next milestone", item["milestone"]),
+                    ("Milestone due date", item["milestone_date"]),
+                    ("Main problem", item["main_problem"]),
+                ]
+            )
+        )
     return lines
 
 
 def build_report(summary: pd.DataFrame, log: pd.DataFrame, source_name: str) -> str:
-    """Compose the full weekly report as a single string."""
+    """Compose the full weekly status report as a single string."""
     generated = datetime.now().strftime("%A, %d %B %Y")
     projects = ordered_projects(summary, log)
-
-    issue_count, risk_count = split_counts(log)
+    issues, risks, other = split_by_type(log)
+    health = overall_health(
+        [project_fields(name, row)["status"] for _, name, row in projects]
+    )
 
     header = [
-        "TPM WEEKLY REPORT",
+        "TPM WEEKLY STATUS REPORT",
         "=" * LINE_WIDTH,
         f"Generated : {generated}",
         f"Source    : {source_name}",
+        f"Sheets    : {SUMMARY_SHEET}; {RISK_SHEET}",
         f"Projects  : {len(projects)}",
-        f"Issues    : {issue_count}",
-        f"Risks     : {risk_count}",
+        f"Health    : {health}",
+        f"Issues    : {len(issues)}",
+        f"Risks     : {len(risks)}",
+        f"Other     : {len(other)}",
+        "",
+        "Fields marked \"Not recorded\" are absent from the tracker. "
+        "Every project, issue, risk, and other logged row is included.",
         "",
     ]
+    # Wrap the note to the rule width.
+    note = header[-2]
+    header = header[:-2] + wrap_text(note) + [""]
 
-    briefs: list[ProjectBrief] = []
-    body: list[str] = []
-    if not projects:
-        body.append("No projects were found in the workbook.")
-    else:
-        for index, (key, name, summary_row) in enumerate(projects, start=1):
-            project_rows = rows_for_project(log, key)
-            briefs.append(make_brief(name, summary_row, project_rows))
-            section = build_project_section(summary_row, project_rows, name)
-            # Numbered heading uses the display name, then the field block.
-            heading = f"{index}. {name}"
-            body.append(heading)
-            body.append("-" * len(heading))
-            body.extend(section)
-            body.append("")
-            body.append("=" * LINE_WIDTH)
-            body.append("")
+    sections = [
+        build_executive_summary(projects, log),
+        build_project_status(projects, log),
+        render_register(
+            "ISSUES REGISTER",
+            issues,
+            issue_pairs,
+            "No issues were found in the tracker.",
+        ),
+        render_register(
+            "RISK REGISTER",
+            risks,
+            risk_pairs,
+            "No risks were found in the tracker.",
+        ),
+        render_register(
+            "OTHER LOGGED ITEMS",
+            other,
+            other_pairs,
+            "No other item types were found in the tracker.",
+        ),
+        build_recommended_actions(log),
+        build_milestones(projects),
+    ]
 
-    summary_lines = build_executive_summary(briefs, log, issue_count, risk_count)
-    parts = header + summary_lines + ["", "=" * LINE_WIDTH, ""] + body
+    parts: list[str] = header
+    for section in sections:
+        parts.extend(section)
+        parts.append("")
+        parts.append("=" * LINE_WIDTH)
+        parts.append("")
+
+    parts.append("END OF REPORT")
+    parts.append(
+        f"Projects {len(projects)} | Issues {len(issues)} | Risks {len(risks)} | Other {len(other)}"
+    )
     return "\n".join(parts).rstrip() + "\n"
 
 
